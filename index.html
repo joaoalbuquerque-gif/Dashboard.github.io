@@ -4,7 +4,49 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Auditoria Cartão Corporativo — EGB</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js">
+// ═══════════════════════ SORT ENGINE ═══════════════════════
+// tableData stores the full dataset for each sortable table
+const tableData = {};
+
+// Register data for a table (called by render functions)
+function registerTableData(tblId, data){ tableData[tblId] = data; }
+
+// sortTbl: called by th onclick
+// tblId: table element id
+// key: field name in data object
+// th: the th element
+// type: 'n' numeric | 's' string | 'risk' risco order
+function sortTbl(tblId, key, th, type){
+  const allThs = th.closest('thead').querySelectorAll('th.sortable');
+  const wasDesc = th.classList.contains('sort-desc');
+  // Reset all headers
+  allThs.forEach(t=>{ t.classList.remove('sort-asc','sort-desc'); });
+  // Toggle direction
+  const asc = wasDesc;  // if was desc, now asc
+  th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+  // Sort the registered data
+  const data = tableData[tblId];
+  if(!data) return;
+  const sorted = [...data].sort((a,b)=>{
+    let va = a[key], vb = b[key];
+    if(type==='n'){ va=parseFloat(va)||0; vb=parseFloat(vb)||0; return asc ? va-vb : vb-va; }
+    if(type==='risk'){
+      const order={ALTO:0,MÉDIO:1,MEDIO:1,BAIXO:2};
+      va=order[String(va).toUpperCase()]??9; vb=order[String(vb).toUpperCase()]??9;
+      return asc ? va-vb : vb-va;
+    }
+    va=String(va||'').toLowerCase(); vb=String(vb||'').toLowerCase();
+    return asc ? va.localeCompare(vb,'pt') : vb.localeCompare(va,'pt');
+  });
+  // Re-render the tbody using the table's render callback
+  tableRenders[tblId](sorted);
+}
+
+// Each table has its own row renderer
+const tableRenders = {};
+
+</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
 :root{
@@ -155,6 +197,19 @@ td.val{font-family:'Syne',sans-serif;font-weight:600;color:var(--gray900)}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--gray300);border-radius:10px}
+
+/* SORTABLE HEADERS */
+th.sortable{cursor:pointer;user-select:none;white-space:nowrap;transition:color .15s}
+th.sortable:hover{color:var(--navy)}
+th.sortable .sort-icon{display:inline-flex;flex-direction:column;gap:1px;margin-left:5px;vertical-align:middle;opacity:.35;transition:opacity .15s}
+th.sortable:hover .sort-icon{opacity:.6}
+th.sortable .sort-icon span{font-size:7px;line-height:1}
+th.sort-asc .sort-icon,th.sort-desc .sort-icon{opacity:1}
+th.sort-asc .sort-icon .sa{color:var(--navy);font-weight:700}
+th.sort-asc .sort-icon .sd{color:var(--gray300)}
+th.sort-desc .sort-icon .sa{color:var(--gray300)}
+th.sort-desc .sort-icon .sd{color:var(--navy);font-weight:700}
+th.sort-asc,th.sort-desc{color:var(--navy)}
 @media(max-width:1400px){.kpi-grid,.fkg{grid-template-columns:repeat(3,1fr)}.pg{grid-template-columns:repeat(2,1fr)}.ps{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:900px){main{padding:10px}.r2,.r2b,.pcr{grid-template-columns:1fr}.kpi-grid,.fkg,.comp-row,.ps,.pg,.rs{grid-template-columns:repeat(2,1fr)}}
 </style>
@@ -235,7 +290,15 @@ td.val{font-family:'Syne',sans-serif;font-weight:600;color:var(--gray900)}
       </div>
       <div class="tc">
         <div class="th"><div class="tt">🚨 Top 15 Maiores Transações</div><div class="tcnt">maiores valores individuais</div></div>
-        <table><thead><tr><th>#</th><th>Mês</th><th>Data</th><th>Estabelecimento</th><th>Categoria</th><th>Valor</th><th>Status</th><th>Observação</th></tr></thead><tbody id="t15"></tbody></table>
+        <table id="tbl-t15"><thead><tr>
+          <th class="sortable" onclick="sortTbl('tbl-t15','mes',this,'s')" data-key="mes" data-dir="asc">#/Mês<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable" onclick="sortTbl('tbl-t15','data',this,'s')">Data<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable" onclick="sortTbl('tbl-t15','estab',this,'s')">Estabelecimento<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable" onclick="sortTbl('tbl-t15','cat',this,'s')">Categoria<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable sort-desc" onclick="sortTbl('tbl-t15','valor',this,'n')">Valor<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable" onclick="sortTbl('tbl-t15','comp',this,'s')">Status<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th>Observação</th>
+        </tr></thead><tbody id="t15"></tbody></table>
       </div>
     </div>
 
@@ -257,7 +320,15 @@ td.val{font-family:'Syne',sans-serif;font-weight:600;color:var(--gray900)}
       <div class="cc" style="margin-top:13px"><div class="ct">Top Fornecedores — Categoria Selecionada</div><div class="cs">Valor total por estabelecimento (nomes unificados)</div><div style="height:190px"><canvas id="cCatF"></canvas></div></div>
       <div class="tc">
         <div class="th"><div class="tt" id="ctl">Transações</div><div class="tcnt" id="ctc">—</div></div>
-        <table><thead><tr><th>Mês</th><th>Data</th><th>Estabelecimento</th><th>Valor</th><th>Status</th><th>FDS</th><th>Observação</th></tr></thead><tbody id="ctb"></tbody></table>
+        <table id="tbl-ctb"><thead><tr>
+          <th class="sortable" onclick="sortTbl('tbl-ctb','mes',this,'s')">Mês<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable" onclick="sortTbl('tbl-ctb','data',this,'s')">Data<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable" onclick="sortTbl('tbl-ctb','estab',this,'s')">Estabelecimento<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable sort-desc" onclick="sortTbl('tbl-ctb','valor',this,'n')">Valor<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable" onclick="sortTbl('tbl-ctb','comp',this,'s')">Status<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable" onclick="sortTbl('tbl-ctb','fds',this,'s')">FDS<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th>Observação</th>
+        </tr></thead><tbody id="ctb"></tbody></table>
       </div>
     </div>
 
@@ -277,7 +348,15 @@ td.val{font-family:'Syne',sans-serif;font-weight:600;color:var(--gray900)}
       </div>
       <div class="tc" style="margin-top:13px">
         <div class="th"><div class="tt">Tabela Completa — Padrões de Consumo</div><div class="tcnt" id="ptc">—</div></div>
-        <table><thead><tr><th>#</th><th>Padrão</th><th>Frequência / Descrição</th><th>Valor Total</th><th>Ticket Médio</th><th>Análise</th><th>Risco</th></tr></thead><tbody id="ptb"></tbody></table>
+        <table id="tbl-ptb"><thead><tr>
+          <th>#</th>
+          <th class="sortable" onclick="sortTbl('tbl-ptb','padrao',this,'s')">Padrão<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th>Frequência / Descrição</th>
+          <th class="sortable sort-desc" onclick="sortTbl('tbl-ptb','valor_total',this,'n')">Valor Total<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable" onclick="sortTbl('tbl-ptb','ticket_medio',this,'n')">Ticket Médio<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th>Análise</th>
+          <th class="sortable" onclick="sortTbl('tbl-ptb','risco',this,'s')">Risco<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+        </tr></thead><tbody id="ptb"></tbody></table>
       </div>
     </div>
 
@@ -296,7 +375,14 @@ td.val{font-family:'Syne',sans-serif;font-weight:600;color:var(--gray900)}
       </div>
       <div class="tc">
         <div class="th"><div class="tt">Todas as Parcelas</div><div class="tcnt" id="prtbl">—</div></div>
-        <table><thead><tr><th>#</th><th>Mês Fatura</th><th>Data Compra</th><th>Estabelecimento</th><th>Categoria</th><th>Valor</th></tr></thead><tbody id="prb"></tbody></table>
+        <table id="tbl-prb"><thead><tr>
+          <th>#</th>
+          <th class="sortable" onclick="sortTbl('tbl-prb','mes',this,'s')">Mês Fatura<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable" onclick="sortTbl('tbl-prb','data',this,'s')">Data Compra<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable" onclick="sortTbl('tbl-prb','estab',this,'s')">Estabelecimento<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable" onclick="sortTbl('tbl-prb','cat',this,'s')">Categoria<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+          <th class="sortable sort-desc" onclick="sortTbl('tbl-prb','valor',this,'n')">Valor<span class="sort-icon"><span class="sa">▲</span><span class="sd">▼</span></span></th>
+        </tr></thead><tbody id="prb"></tbody></table>
       </div>
     </div>
 
@@ -359,14 +445,21 @@ const baseX={grid:{display:false}};
 function init(){bldTop15();bldOverview();bldCatDD();ucat();bldPatterns();bldParc();}
 
 // TOP15
-function bldTop15(){
-  document.getElementById('t15').innerHTML=DATA.top15.map((r,i)=>`
+function renderT15(rows){
+  document.getElementById('t15').innerHTML=rows.map((r,i)=>`
     <tr><td style="color:#9CA3AF;font-size:10px">${i+1}</td>
     <td style="font-size:10px">${r.mes}</td><td style="font-size:10px">${r.data}</td>
     <td style="max-width:185px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px" title="${r.estab}">${r.estab}</td>
     <td style="font-size:10px">${r.cat}</td><td class="val">${fmt(r.valor)}</td>
     <td>${bdg(r.comp)}</td>
     <td style="font-size:10px;color:#9CA3AF;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.obs}">${r.obs||'—'}</td></tr>`).join('');
+}
+function bldTop15(){
+  // Default: sort by valor desc
+  const sorted=[...DATA.top15].sort((a,b)=>b.valor-a.valor);
+  registerTableData('tbl-t15', DATA.top15);
+  tableRenders['tbl-t15']=renderT15;
+  renderT15(sorted);
 }
 
 // OVERVIEW CHARTS
@@ -434,12 +527,17 @@ function ucat(){
   const tF=Object.entries(fMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
   mk('cCatF',{type:'bar',data:{labels:tF.map(([n])=>n.length>32?n.slice(0,32)+'…':n),datasets:[{data:tF.map(([,v])=>v),backgroundColor:PA.slice(0,tF.length),borderRadius:4}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+fK(ctx.raw)}}},scales:{x:{...baseY},y:{grid:{display:false}}}}});
-  document.getElementById('ctb').innerHTML=trans.slice(0,100).map(t=>`
-    <tr><td style="font-size:10px">${t.mes}</td><td style="font-size:10px">${t.data}</td>
-    <td style="max-width:215px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px" title="${t.estab}">${t.estab}</td>
-    <td class="val">${fmt(t.valor)}</td><td>${bdg(t.comp)}</td>
-    <td style="font-size:10px;${t.fds==='Sim'?'color:var(--red);font-weight:700':''}">${t.fds}</td>
-    <td style="font-size:10px;color:#9CA3AF;max-width:175px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.obs}">${t.obs||'—'}</td></tr>`).join('');
+  const renderCtb=rows=>{
+    document.getElementById('ctb').innerHTML=rows.slice(0,120).map(t=>`
+      <tr><td style="font-size:10px">${t.mes}</td><td style="font-size:10px">${t.data}</td>
+      <td style="max-width:215px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px" title="${t.estab}">${t.estab}</td>
+      <td class="val">${fmt(t.valor)}</td><td>${bdg(t.comp)}</td>
+      <td style="font-size:10px;${t.fds==='Sim'?'color:var(--red);font-weight:700':''}">${t.fds}</td>
+      <td style="font-size:10px;color:#9CA3AF;max-width:175px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${t.obs}">${t.obs||'—'}</td></tr>`).join('');
+  };
+  registerTableData('tbl-ctb', trans);
+  tableRenders['tbl-ctb']=renderCtb;
+  renderCtb(trans);
 }
 
 // PATTERNS
@@ -476,14 +574,21 @@ function bldPatterns(){
   const aT=alto.reduce((a,p)=>a+p.valor_total,0),mT=medio.reduce((a,p)=>a+p.valor_total,0),bT=baixo.reduce((a,p)=>a+p.valor_total,0);
   mk('cPD',{type:'doughnut',data:{labels:['🔴 Risco Alto','🟡 Risco Médio','🟢 Risco Baixo'],datasets:[{data:[aT,mT,bT],backgroundColor:['rgba(220,38,38,.8)','rgba(217,119,6,.8)','rgba(5,150,105,.8)'],borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10.5},boxWidth:12}},tooltip:{callbacks:{label:ctx=>' '+fK(ctx.raw)+' ('+pct(ctx.raw,aT+mT+bT)+')'}}},cutout:'58%'}});
-  document.getElementById('ptb').innerHTML=PT.map((p,i)=>{const r=rc(p.risco);return`
-    <tr><td style="color:#9CA3AF;font-size:10px">${i+1}</td>
-    <td style="font-weight:600;font-size:11px">${p.padrao}</td>
-    <td style="font-size:10px;color:var(--gray500)">${p.freq_desc}</td>
-    <td class="val" style="${r==='alto'?'color:var(--red)':''}">${fmt(p.valor_total)}</td>
-    <td class="val" style="font-size:10.5px">${p.ticket_medio>0?fmt(p.ticket_medio):'—'}</td>
-    <td style="font-size:10px;max-width:200px">${p.analise}</td>
-    <td><span class="rb ${r}">${p.risco}</span></td></tr>`;}).join('');
+  const renderPtb=rows=>{
+    document.getElementById('ptb').innerHTML=rows.map((p,i)=>{const r=rc(p.risco);return`
+      <tr><td style="color:#9CA3AF;font-size:10px">${i+1}</td>
+      <td style="font-weight:600;font-size:11px">${p.padrao}</td>
+      <td style="font-size:10px;color:var(--gray500)">${p.freq_desc}</td>
+      <td class="val" style="${r==='alto'?'color:var(--red)':''}">${fmt(p.valor_total)}</td>
+      <td class="val" style="font-size:10.5px">${p.ticket_medio>0?fmt(p.ticket_medio):'—'}</td>
+      <td style="font-size:10px;max-width:200px">${p.analise}</td>
+      <td><span class="rb ${r}">${p.risco}</span></td></tr>`;}).join('');
+  };
+  registerTableData('tbl-ptb', PT);
+  tableRenders['tbl-ptb']=renderPtb;
+  // default: sort valor_total desc
+  const ptbSorted=[...PT].sort((a,b)=>b.valor_total-a.valor_total);
+  renderPtb(ptbSorted);
 }
 
 // PARCELAMENTOS
@@ -502,11 +607,16 @@ function bldParc(){
   const cE=Object.entries(cM).sort((a,b)=>b[1]-a[1]);
   mk('cPC',{type:'doughnut',data:{labels:cE.map(([n])=>n.length>22?n.slice(0,22)+'…':n),datasets:[{data:cE.map(([,v])=>v),backgroundColor:P,borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:9.5},boxWidth:10}},tooltip:{callbacks:{label:ctx=>' '+fK(ctx.raw)}}},cutout:'55%'}});
-  document.getElementById('prb').innerHTML=P2.map((p,i)=>`
-    <tr><td style="color:#9CA3AF;font-size:10px">${i+1}</td>
-    <td style="font-size:10px">${p.mes}</td><td style="font-size:10px">${p.data}</td>
-    <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px" title="${p.estab}">${p.estab}</td>
-    <td style="font-size:10px">${p.cat}</td><td class="val">${fmt(p.valor)}</td></tr>`).join('');
+  const renderPrb=rows=>{
+    document.getElementById('prb').innerHTML=rows.map((p,i)=>`
+      <tr><td style="color:#9CA3AF;font-size:10px">${i+1}</td>
+      <td style="font-size:10px">${p.mes}</td><td style="font-size:10px">${p.data}</td>
+      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px" title="${p.estab}">${p.estab}</td>
+      <td style="font-size:10px">${p.cat}</td><td class="val">${fmt(p.valor)}</td></tr>`).join('');
+  };
+  registerTableData('tbl-prb', P2);
+  tableRenders['tbl-prb']=renderPrb;
+  renderPrb(P2);
 }
 </script>
 </body>
